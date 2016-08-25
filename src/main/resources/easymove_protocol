@@ -1,0 +1,23 @@
+A request has 2 parts.
+
+1) path
+2) tar file
+
+PATH
+
+At the very beginning of the request is an integral number indicating the
+length of the path, followed by a whitespace character and target path. After
+the path there is a whitespace character, and then starts the content of the
+tar file.
+
+
+TAR FILE
+
+An easymove client first packages the files it would like to send into a
+tarball and sends the tarball together with the target path to an easymove
+server. The easymove server unpacks the tarball into the specified path.
+
+
+EXAMPLE REQUEST
+
+22 /home/serdil/downloads 4Gj+@29F80x84lk19... (bytes of the tar file)

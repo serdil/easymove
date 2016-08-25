@@ -1,0 +1,223 @@
+Index: src/main/java/com/serdil/easymove/client/StandardFileUploader.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/serdil/easymove/client/StandardFileUploader.java	(date 1440761320000)
++++ src/main/java/com/serdil/easymove/client/StandardFileUploader.java	(revision )
+@@ -10,7 +10,7 @@
+ /**
+  * Created by Sinan Erdil on 26.08.2015.
+  */
+-public class StandardFileUploader implements FileUploader {
++public class StandardFileUploader implements Uploader {
+ 
+     public void upload(Socket s, File f) throws IOException {
+         IOUtils.copy(new FileInputStream(f), s.getOutputStream());
+Index: src/main/java/com/serdil/easymove/handlers/RequestHandler.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/serdil/easymove/handlers/RequestHandler.java	(date 1440761320000)
++++ src/main/java/com/serdil/easymove/handlers/RequestHandler.java	(revision )
+@@ -1,5 +1,7 @@
+ package com.serdil.easymove.handlers;
+ 
++import org.omg.CORBA_2_3.portable.InputStream;
++
+ import java.io.IOException;
+ import java.net.Socket;
+ 
+Index: pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- pom.xml	(date 1440761320000)
++++ pom.xml	(revision )
+@@ -68,6 +68,11 @@
+             <artifactId>commons-io</artifactId>
+             <version>2.2</version>
+         </dependency>
++        <dependency>
++            <groupId>org.apache.commons</groupId>
++            <artifactId>commons-compress</artifactId>
++            <version>1.10</version>
++        </dependency>
+     </dependencies>
+ 
+ 
+\ No newline at end of file
+Index: src/main/java/com/serdil/easymove/client/UploaderFactory.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/serdil/easymove/client/UploaderFactory.java	(revision )
++++ src/main/java/com/serdil/easymove/client/UploaderFactory.java	(revision )
+@@ -0,0 +1,19 @@
++package com.serdil.easymove.client;
++
++import com.sun.javaws.exceptions.InvalidArgumentException;
++
++/**
++ * Created by Sinan on 30.08.2015.
++ */
++public class UploaderFactory {
++    public static final int STANDARD = 0;
++    public static final int TARRING = 1;
++
++    public Uploader create(int type) {
++        switch (type) {
++            case STANDARD: return new StandardFileUploader();
++            case TARRING: return new TarringUploader();
++        }
++        throw new IllegalArgumentException("invalid uploader type");
++    }
++}
+Index: src/main/java/com/serdil/easymove/handlers/TarringRequestHandler.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/serdil/easymove/handlers/TarringRequestHandler.java	(revision )
++++ src/main/java/com/serdil/easymove/handlers/TarringRequestHandler.java	(revision )
+@@ -0,0 +1,15 @@
++package com.serdil.easymove.handlers;
++
++import java.io.IOException;
++import java.net.Socket;
++
++/**
++ * Created by Sinan on 30.08.2015.
++ */
++public class TarringRequestHandler implements RequestHandler {
++
++    @Override
++    public void handle(Socket s) throws IOException {
++
++    }
++}
+Index: .idea/libraries/Maven__org_apache_commons_commons_compress_1_10.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/libraries/Maven__org_apache_commons_commons_compress_1_10.xml	(revision )
++++ .idea/libraries/Maven__org_apache_commons_commons_compress_1_10.xml	(revision )
+@@ -0,0 +1,13 @@
++<component name="libraryTable">
++  <library name="Maven: org.apache.commons:commons-compress:1.10">
++    <CLASSES>
++      <root url="jar://$MAVEN_REPOSITORY$/org/apache/commons/commons-compress/1.10/commons-compress-1.10.jar!/" />
++    </CLASSES>
++    <JAVADOC>
++      <root url="jar://$MAVEN_REPOSITORY$/org/apache/commons/commons-compress/1.10/commons-compress-1.10-javadoc.jar!/" />
++    </JAVADOC>
++    <SOURCES>
++      <root url="jar://$MAVEN_REPOSITORY$/org/apache/commons/commons-compress/1.10/commons-compress-1.10-sources.jar!/" />
++    </SOURCES>
++  </library>
++</component>
+\ No newline at end of file
+Index: src/main/java/com/serdil/easymove/client/TarringUploader.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/serdil/easymove/client/TarringUploader.java	(revision )
++++ src/main/java/com/serdil/easymove/client/TarringUploader.java	(revision )
+@@ -0,0 +1,38 @@
++package com.serdil.easymove.client;
++
++import org.apache.commons.compress.archivers.ArchiveException;
++import org.apache.commons.compress.archivers.ArchiveOutputStream;
++import org.apache.commons.compress.archivers.ArchiveStreamFactory;
++import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
++import org.apache.commons.io.FileUtils;
++
++import java.io.File;
++import java.io.IOException;
++import java.net.Socket;
++
++/**
++ * Created by Sinan on 30.08.2015.
++ */
++public class TarringUploader implements Uploader {
++    @Override
++    public void upload(Socket s, File f) throws IOException, ArchiveException {
++        ArchiveOutputStream tarredOut = new ArchiveStreamFactory()
++                .createArchiveOutputStream(ArchiveStreamFactory.TAR, s
++                        .getOutputStream());
++        addRecursively(tarredOut, f, "");
++        tarredOut.close();
++        s.close();
++    }
++
++    public static void addRecursively(ArchiveOutputStream aos, File f, String
++            base) throws IOException {
++        String entry = base + f.getName();
++        aos.putArchiveEntry(new TarArchiveEntry(f, entry));
++        if (f.isFile()) FileUtils.copyFile(f, aos);
++        aos.closeArchiveEntry();
++        if (f.isDirectory()) {
++            for (File child : f.listFiles())
++            addRecursively(aos, child, entry + "/");
++        }
++    }
++}
+Index: src/main/java/com/serdil/easymove/client/Uploader.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- src/main/java/com/serdil/easymove/client/Uploader.java	(revision )
++++ src/main/java/com/serdil/easymove/client/Uploader.java	(revision )
+@@ -0,0 +1,14 @@
++package com.serdil.easymove.client;
++
++import org.apache.commons.compress.archivers.ArchiveException;
++
++import java.io.File;
++import java.io.IOException;
++import java.net.Socket;
++
++/**
++ * Created by Sinan Erdil on 26.08.2015.
++ */
++public interface Uploader {
++    void upload(Socket s, File f) throws IOException, ArchiveException;
++}
+Index: easymove.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- easymove.iml	(date 1440761320000)
++++ easymove.iml	(revision )
+@@ -21,5 +21,6 @@
+       </library>
+     </orderEntry>
+     <orderEntry type="library" name="Maven: commons-io:commons-io:2.2" level="project" />
++    <orderEntry type="library" name="Maven: org.apache.commons:commons-compress:1.10" level="project" />
+   </component>
+ </module>
+\ No newline at end of file
+Index: src/main/java/com/serdil/easymove/client/FileUploader.java
+===================================================================
+--- src/main/java/com/serdil/easymove/client/FileUploader.java	(date 1440761320000)
++++ src/main/java/com/serdil/easymove/client/FileUploader.java	(date 1440761320000)
+@@ -1,12 +0,0 @@
+-package com.serdil.easymove.client;
+-
+-import java.io.File;
+-import java.io.IOException;
+-import java.net.Socket;
+-
+-/**
+- * Created by Sinan Erdil on 26.08.2015.
+- */
+-public interface FileUploader {
+-    void upload(Socket s, File f) throws IOException;
+-}
